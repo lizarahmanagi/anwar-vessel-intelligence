@@ -1,0 +1,16 @@
+.git
+.gitignore
+.dockerignore
+.env
+*.pdf
+*.log
+logs/
+reports/
+weekly_data/
+__pycache__/
+*.pyc
+graphify-out/
+vessels_data.csv
+analysis_output.txt
+full_vessel_report.html
+index.html

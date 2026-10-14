@@ -1,0 +1,8 @@
+requests
+beautifulsoup4
+PyPDF2
+pandas
+python-dotenv
+langchain-groq
+ntlm-auth
+passlib
