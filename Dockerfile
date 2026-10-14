@@ -5,7 +5,9 @@ ENV PYTHONUNBUFFERED=1 \
     TZ=Asia/Dhaka
 
 RUN apt-get update && apt-get install -y --no-install-recommends cron tzdata \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/share/zoneinfo/Asia/Dhaka /etc/localtime \
+    && echo "Asia/Dhaka" > /etc/timezone
 
 WORKDIR /app
 
