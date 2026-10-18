@@ -1040,9 +1040,32 @@ class EmailReportSender:
             'padding: 14px 16px;">' + ''.join(html) + '</div>'
         )
 
-    def send_email(self, report_path):
-        """Send report via email"""
+    def _sent_marker(self, report_path):
+        """Path of the sent-marker file for a report."""
+        return os.path.join(os.path.dirname(report_path), f".{os.path.basename(report_path)}.sent")
+
+    def _already_sent(self, report_path):
+        """True if this exact report has already been emailed."""
+        return os.path.exists(self._sent_marker(report_path))
+
+    def _mark_sent(self, report_path):
+        """Record that this report has been emailed (once-per-day guard)."""
         try:
+            with open(self._sent_marker(report_path), "w", encoding="utf-8") as f:
+                f.write(datetime.now().isoformat())
+            logger.info(f"✅ Marked as sent: {os.path.basename(report_path)}")
+        except Exception as e:
+            logger.warning(f"⚠️  Could not write sent-marker: {str(e)}")
+
+    def send_email(self, report_path):
+        """Send report via email, at most once per report."""
+        try:
+            if os.getenv("ALLOW_RESEND", "0") == "1":
+                logger.info("ℹ️  ALLOW_RESEND=1 - bypassing once-per-report guard")
+            elif self._already_sent(report_path):
+                logger.info(f"⏭️  Report already sent, skipping: {os.path.basename(report_path)}")
+                return True
+
             # Read report
             report_content = self.read_report(report_path)
             if not report_content:
@@ -1069,6 +1092,7 @@ class EmailReportSender:
 
             logger.info(f"✅ Report sent successfully to {len(self.receiver_emails)} recipient(s)")
             logger.info(f"📧 Recipients: {', '.join(self.receiver_emails)}")
+            self._mark_sent(report_path)
             return True
 
         except smtplib.SMTPAuthenticationError:
