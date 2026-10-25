@@ -763,6 +763,11 @@ class EmailReportSender:
         <div class="footer">
             <p><strong>BlueRoute Shipping Intelligence</strong></p>
             <p>Prepared for Anwar Group of Industries — Anwar Ispat · Anwar Cement · Anwar Cement Sheet · Anwar Galvanizing · A1 Polymer</p>
+            <p style="margin-top: 14px; font-size: 12px; letter-spacing: 0.4px;">WE'D LOVE TO HEAR FROM YOU</p>
+            <div style="margin-top: 10px;">
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLScW9S5lbqIvDKIXgS8iUtXanF7K25cYdxcKzf7Qc-4MCoCdFQ/viewform" style="display: inline-block; background-color: #ffffff; color: #123F76; font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: 6px; text-decoration: none; margin: 4px 6px;">Share Your Feedback</a>
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLSfnblxWqVcz4OqBYBSErxD19RFKt8z0gUip9oljkKz3r8IWIQ/viewform" style="display: inline-block; background-color: #1e5a9f; color: #ffffff; font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: 6px; text-decoration: none; border: 2px solid #ffffff; margin: 4px 6px;">Stakeholder Satisfaction Survey</a>
+            </div>
             <p style="margin-top: 10px;">Developed by the Digital Transformation Team</p>
         </div>
     </div>
