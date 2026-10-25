@@ -114,6 +114,26 @@ class DailyAnalysisPipeline:
             except Exception as e:
                 logger.warning(f"⚠️  Vector store error (email unaffected): {str(e)}")
 
+            # STEP 3.6: Daily backup of raw artifacts (persisted in Dokploy volume)
+            try:
+                import shutil
+
+                backup_dir = os.path.join(
+                    PROJECT_DIR, "backups", datetime.now().strftime("%Y-%m-%d")
+                )
+                os.makedirs(backup_dir, exist_ok=True)
+                for src_name in ["vessels_data.csv", "analysis_output.txt"]:
+                    src = os.path.join(self.project_dir, src_name)
+                    if os.path.exists(src):
+                        shutil.copy2(src, os.path.join(backup_dir, src_name))
+                if md_report and os.path.exists(md_report):
+                    shutil.copy2(
+                        md_report, os.path.join(backup_dir, os.path.basename(md_report))
+                    )
+                logger.info(f"💾 Backup saved to {backup_dir}")
+            except Exception as e:
+                logger.warning(f"⚠️  Backup step error (email unaffected): {str(e)}")
+
             # STEP 4: Send Email Report
             if self.email_sender:
                 logger.info("\n📧 STEP 4: Sending Report via Email...")

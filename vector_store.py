@@ -21,13 +21,15 @@ logger = logging.getLogger(__name__)
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Point HOME at the mounted weekly_data volume so the Chroma ONNX embedding
-# model cache (~80 MB) is downloaded once and persists across redeploys.
-_WEEKLY_DIR = os.path.join(PROJECT_DIR, "weekly_data")
-os.environ.setdefault("HOME", _WEEKLY_DIR)
+# Persisted Dokploy volume (anwar-vector-db) mounted at /app/vector_db in the
+# container, so the database and the embedding model cache survive redeploys.
+STORE_DIR = os.environ.get("VECTOR_DB_DIR", os.path.join(PROJECT_DIR, "vector_db"))
+
+# Point HOME at the vector volume so the Chroma ONNX embedding model cache
+# (~80 MB) is downloaded once and persisted across redeploys.
+os.environ.setdefault("HOME", STORE_DIR)
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 
-STORE_DIR = os.path.join(_WEEKLY_DIR, "vector_db")
 COLLECTION = "vessel_reports"
 
 
