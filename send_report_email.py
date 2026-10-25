@@ -434,6 +434,7 @@ class EmailReportSender:
             overflow: hidden;
         }}
         .header {{
+            background: #123F76;
             background: linear-gradient(135deg, #123F76 0%, #1e5a9f 50%, #123F76 100%);
             color: white;
             padding: 16px 20px 14px 20px;
@@ -507,20 +508,15 @@ class EmailReportSender:
             letter-spacing: 0.2px;
         }}
         .stats-container {{
-            display: table;
             width: 100%;
-            border-spacing: 10px;
         }}
         .stat-card {{
-            display: table-cell;
             width: 25%;
             background: #f0f7ff;
             padding: 12px 10px;
             border-radius: 6px;
             border-left: 4px solid #123F76;
             vertical-align: top;
-            box-shadow: 0 2px 6px rgba(25, 103, 210, 0.08);
-            transition: all 0.3s ease;
             position: relative;
         }}
         .stat-card::before {{
@@ -533,10 +529,10 @@ class EmailReportSender:
             background: linear-gradient(90deg, transparent, rgba(25, 103, 210, 0.2), transparent);
         }}
         .stat-card.blue {{
+            background: #123F76;
             background: linear-gradient(135deg, #123F76 0%, #1e5a9f 100%);
             border-left: 5px solid #1e5a9f;
             color: white;
-            box-shadow: 0 4px 6px rgba(46, 127, 214, 0.2);
         }}
         .stat-card.blue .stat-label {{
             color: rgba(255,255,255,0.85);
@@ -545,10 +541,10 @@ class EmailReportSender:
             color: white;
         }}
         .stat-card.green {{
+            background: #0d4f7f;
             background: linear-gradient(135deg, #0d4f7f 0%, #1669a3 100%);
             border-left: 5px solid #1669a3;
             color: white;
-            box-shadow: 0 4px 6px rgba(24, 153, 214, 0.2);
         }}
         .stat-card.green .stat-label {{
             color: rgba(255,255,255,0.85);
@@ -557,10 +553,10 @@ class EmailReportSender:
             color: white;
         }}
         .stat-card.orange {{
+            background: #2b8fc4;
             background: linear-gradient(135deg, #2b8fc4 0%, #2196f3 100%);
             border-left: 5px solid #2196f3;
             color: white;
-            box-shadow: 0 4px 6px rgba(33, 150, 243, 0.2);
         }}
         .stat-card.orange .stat-label {{
             color: rgba(255,255,255,0.85);
@@ -569,10 +565,10 @@ class EmailReportSender:
             color: white;
         }}
         .stat-card.purple {{
+            background: #4d9fc6;
             background: linear-gradient(135deg, #4d9fc6 0%, #3a8ec4 100%);
             border-left: 5px solid #3a8ec4;
             color: white;
-            box-shadow: 0 4px 6px rgba(66, 165, 245, 0.2);
         }}
         .stat-card.purple .stat-label {{
             color: rgba(255,255,255,0.85);
@@ -601,6 +597,7 @@ class EmailReportSender:
             font-size: 11px;
         }}
         thead {{
+            background: #123F76;
             background: linear-gradient(135deg, #123F76 0%, #1e5a9f 100%);
             color: white;
         }}
@@ -655,6 +652,7 @@ class EmailReportSender:
             margin: 8px 0;
         }}
         .footer {{
+            background: #123F76;
             background: linear-gradient(135deg, #123F76 0%, #1e5a9f 100%);
             padding: 15px 25px;
             text-align: center;
@@ -686,24 +684,34 @@ class EmailReportSender:
             <!-- Fleet Statistics -->
             <div class="section">
                 <h2>📊 Fleet Summary</h2>
-                <div class="stats-container">
-                    <div class="stat-card blue">
-                        <div class="stat-label">Total Fleet</div>
-                        <div class="stat-value">{stats.get('Total Fleet', '0')}</div>
-                    </div>
-                    <div class="stat-card green">
-                        <div class="stat-label">Active Vessels</div>
-                        <div class="stat-value">{stats.get('Active Vessels', '0')}</div>
-                    </div>
-                    <div class="stat-card orange">
-                        <div class="stat-label">Total Capacity</div>
-                        <div class="stat-value" style="font-size: 16px;">{stats.get('Total Capacity', '0 GRT')}</div>
-                    </div>
-                    <div class="stat-card purple">
-                        <div class="stat-label">Avg Draft</div>
-                        <div class="stat-value">{stats.get('Average Draft', '0')}m</div>
-                    </div>
-                </div>
+                <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%;">
+                    <tr>
+                        <td width="25%" valign="top" style="padding: 5px;">
+                            <div class="stat-card blue">
+                                <div class="stat-label">Total Fleet</div>
+                                <div class="stat-value">{stats.get('Total Fleet', '0')}</div>
+                            </div>
+                        </td>
+                        <td width="25%" valign="top" style="padding: 5px;">
+                            <div class="stat-card green">
+                                <div class="stat-label">Active Vessels</div>
+                                <div class="stat-value">{stats.get('Active Vessels', '0')}</div>
+                            </div>
+                        </td>
+                        <td width="25%" valign="top" style="padding: 5px;">
+                            <div class="stat-card orange">
+                                <div class="stat-label">Total Capacity</div>
+                                <div class="stat-value" style="font-size: 16px;">{stats.get('Total Capacity', '0 GRT')}</div>
+                            </div>
+                        </td>
+                        <td width="25%" valign="top" style="padding: 5px;">
+                            <div class="stat-card purple">
+                                <div class="stat-label">Avg Draft</div>
+                                <div class="stat-value">{stats.get('Average Draft', '0')}m</div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
             </div>
 
             <div class="divider"></div>
@@ -768,7 +776,7 @@ class EmailReportSender:
                 <a href="https://docs.google.com/forms/d/e/1FAIpQLScW9S5lbqIvDKIXgS8iUtXanF7K25cYdxcKzf7Qc-4MCoCdFQ/viewform" style="display: inline-block; background-color: #ffffff; color: #123F76; font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: 6px; text-decoration: none; margin: 4px 6px;">Share Your Feedback</a>
                 <a href="https://docs.google.com/forms/d/e/1FAIpQLSfnblxWqVcz4OqBYBSErxD19RFKt8z0gUip9oljkKz3r8IWIQ/viewform" style="display: inline-block; background-color: #1e5a9f; color: #ffffff; font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: 6px; text-decoration: none; border: 2px solid #ffffff; margin: 4px 6px;">Stakeholder Satisfaction Survey</a>
             </div>
-            <p style="margin-top: 10px;">Developed by the Digital Transformation Team</p>
+            <p style="margin-top: 10px;">Generated by Digital Transformation Team</p>
         </div>
     </div>
 </body>
