@@ -97,6 +97,23 @@ class DailyAnalysisPipeline:
                 logger.error("❌ Report generation failed")
                 return False
 
+            # STEP 3.5: Store report + vessel records in the vector database
+            try:
+                logger.info("\n🧠 STEP 3.5: Saving to vector database...")
+                logger.info("-" * 70)
+                from vector_store import VectorStore, read_csv_rows
+
+                with open(md_report, encoding="utf-8") as _f:
+                    report_content = _f.read()
+
+                stored = VectorStore().save_report(
+                    report_content,
+                    csv_rows=read_csv_rows(self.csv_file),
+                )
+                logger.info(f"🧠 Vector store: {stored} record(s) persisted")
+            except Exception as e:
+                logger.warning(f"⚠️  Vector store error (email unaffected): {str(e)}")
+
             # STEP 4: Send Email Report
             if self.email_sender:
                 logger.info("\n📧 STEP 4: Sending Report via Email...")

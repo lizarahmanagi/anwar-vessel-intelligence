@@ -6,3 +6,4 @@ python-dotenv
 langchain-groq
 ntlm-auth
 passlib
+chromadb>=0.5,<1
