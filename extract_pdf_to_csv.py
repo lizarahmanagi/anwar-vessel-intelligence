@@ -393,6 +393,39 @@ class PDFExtractor:
             logger.debug(f"Unable to parse vessel line: {line!r} ({str(e)})")
             return None
 
+    # Cargo codes that are grocery / agricultural commodities and must be
+    # dropped from the daily report. Kept: construction & industrial cargo
+    # (COAL, C.CLINK, SLAG, LIMESTONE, GI(SCRAP), STONE, GYPSUM, AGGREGATE,
+    # FELDSPAR, BALL CLAY, ...), containers (CONT), fuel (GAS OIL, LNG, LPG,
+    # GAS, MTBE), ballast and demolition.
+    GROCERY_CARGO_TYPES = {
+        'WHEAT', 'SOYABEAN', 'RBD', 'RAW SUGAR', 'SUGAR', 'Y.CORN', 'CORN',
+        'LENTILS', 'SALT', 'DAP', 'MOP', 'RICE',
+    }
+
+    def filter_out_grocery(self, vessels):
+        """Remove grocery / agricultural commodity vessels from the lineup."""
+        def is_grocery(cargo_type):
+            normalized = str(cargo_type).upper().strip()
+            normalized = re.sub(r'\s+', ' ', normalized)
+            return normalized in self.GROCERY_CARGO_TYPES
+
+        kept, dropped = [], []
+        for vessel in vessels:
+            cargo = vessel.get('Cargo_Type', '')
+            if is_grocery(cargo):
+                dropped.append(vessel)
+            else:
+                kept.append(vessel)
+
+        if dropped:
+            dropped_names = ', '.join(
+                f"{v['Vessel_Name']} ({v.get('Cargo_Type', '')})" for v in dropped
+            )
+            logger.info(f"🚫 Excluded {len(dropped)} grocery/agricultural commodity vessels: {dropped_names}")
+        logger.info(f"🏗️  Kept {len(kept)} vessels (construction/industrial cargo only)")
+        return kept
+
     def save_to_csv(self, vessels):
         """Save vessels to CSV file"""
         try:
@@ -464,6 +497,13 @@ class PDFExtractor:
         vessels = self.extract_table_from_pdf(pdf_path)
         if not vessels:
             logger.error("No vessels extracted from PDF")
+            return False
+
+        # Step 3.5: Drop grocery / agricultural commodities (business rule:
+        # report covers construction & industrial cargo only).
+        vessels = self.filter_out_grocery(vessels)
+        if not vessels:
+            logger.error("No vessels left after grocery-commodity filter")
             return False
 
         # Step 4: Save to CSV
