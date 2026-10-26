@@ -9,6 +9,7 @@ import PyPDF2
 import csv
 import os
 import re
+import time
 from datetime import datetime
 import logging
 
@@ -37,15 +38,36 @@ class PDFExtractor:
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+    def _fetch_with_retries(self, url, timeout=60, attempts=3):
+        """GET a URL with retries/backoff - the CPA site is slow and flaky."""
+        last_error = None
+        for attempt in range(1, attempts + 1):
+            try:
+                logger.info(f"🌐 Fetching {url.split('?')[0]} (attempt {attempt}/{attempts})...")
+                response = self.session.get(url, timeout=timeout)
+                response.raise_for_status()
+                return response
+            except Exception as e:
+                last_error = e
+                logger.warning(f"⚠️  Attempt {attempt}/{attempts} failed: {str(e)}")
+                if attempt < attempts:
+                    wait = 10 * attempt
+                    logger.info(f"⏳ Retrying in {wait}s...")
+                    time.sleep(wait)
+        raise last_error if last_error else RuntimeError("Request failed")
+
     def get_latest_pdf(self):
-        """Get the latest vessel PDF from CPA website"""
+        """Get the newest vessel PDFs from the CPA website"""
         try:
             logger.info("🔍 Fetching latest PDF from CPA website...")
 
-            url = "https://cpa.gov.bd/pages/common-documents/?page=1&page_size=10&search=%E0%A6%9C%E0%A6%BE%E0%A6%B9%E0%A6%BE%E0%A6%9C%E0%A7%87%E0%A6%B0+%E0%A6%A4%E0%A6%A5%E0%A7%8D%E0%A6%AF"
+            # The vessel-information documents are filed under 'Berthing-Schedule'.
+            # Fetch the unfiltered listing (server-rendered rows) and collect the
+            # newest rows that carry a vessel PDF - more robust than relying on
+            # the Bengali search query.
+            url = "https://cpa.gov.bd/pages/common-documents/?page=1&page_size=50"
 
-            response = self.session.get(url, timeout=15)
-            response.raise_for_status()
+            response = self._fetch_with_retries(url, timeout=60, attempts=3)
 
             soup = BeautifulSoup(response.content, 'html.parser')
             table_rows = soup.find_all('tr')
@@ -54,44 +76,109 @@ class PDFExtractor:
                 logger.warning("No documents found")
                 return None
 
+            candidates = []
+
             for row in table_rows:
                 cells = row.find_all('td')
-                if len(cells) >= 4:
-                    for cell in cells:
-                        link = cell.find('a', href=True)
-                        if link and '.pdf' in link.get('href', '').lower():
-                            pdf_url = link.get('href')
-                            if not pdf_url.startswith('http'):
-                                pdf_url = self.base_url + pdf_url
+                if len(cells) < 4:
+                    continue
 
-                            return {
-                                'url': pdf_url,
-                                'filename': os.path.basename(pdf_url.split('?')[0]),
-                                'title': cells[1].get_text(strip=True) if len(cells) > 1 else 'vessel_data'
-                            }
+                doctype = cells[2].get_text(strip=True) if len(cells) > 2 else ''
+                title = cells[1].get_text(strip=True) if len(cells) > 1 else ''
 
-            return None
+                # Only vessel lineup docs (doctype Berthing-Schedule / Vessels-Particulars,
+                # or a Bengali title mentioning vessel info)
+                is_vessel_doc = (
+                    doctype.lower() in ('berthing-schedule', 'vessels-particulars')
+                    or 'জাহাজ' in title
+                )
+
+                link = row.find('a', href=True)
+                if not (link and '.pdf' in link.get('href', '').lower()):
+                    continue
+
+                pdf_url = link.get('href')
+                if not pdf_url.startswith('http'):
+                    pdf_url = self.base_url + pdf_url
+
+                if not is_vessel_doc:
+                    # The listing is newest-first; once we have seen vessel docs,
+                    # older non-vessel rows can be ignored.
+                    if candidates:
+                        break
+                    continue
+
+                candidates.append({
+                    'url': pdf_url,
+                    'filename': os.path.basename(pdf_url.split('?')[0]),
+                    'title': title or 'vessel_data'
+                })
+
+            if not candidates:
+                logger.warning("No vessel PDFs found in listing")
+                return None
+
+            return candidates
 
         except Exception as e:
             logger.error(f"Error fetching PDF: {str(e)}")
             return None
+
+    def _pdf_dated(self, pdf_path):
+        """Read the DATED: line from a CPA PDF's first page (DD/MM/YYYY)."""
+        try:
+            with open(pdf_path, 'rb') as f:
+                reader = PyPDF2.PdfReader(f)
+                text = reader.pages[0].extract_text() or ''
+            m = re.search(r'DATED:\s*(\d{1,2}/\d{1,2}/\d{4})', text, re.IGNORECASE)
+            if m:
+                return datetime.strptime(m.group(1), '%d/%m/%Y')
+        except Exception as e:
+            logger.debug(f"Could not read DATED from {pdf_path}: {str(e)}")
+        return None
+
+    def _is_vessel_lineup(self, pdf_path):
+        """True if this PDF is the daily vessel declaration lineup (not the
+        berthing-position sheet CPA also files under 'Berthing-Schedule')."""
+        try:
+            with open(pdf_path, 'rb') as f:
+                reader = PyPDF2.PdfReader(f)
+                text = (reader.pages[0].extract_text() or '') if reader.pages else ''
+            upper = text.upper()
+            if 'BERTHING POSITION' in upper or 'PERFORMANCE' in upper:
+                return False
+            return (
+                'LIST OF VESSELS' in upper
+                or 'VESSELS DUE' in upper
+                or 'VESSELS READY' in upper
+                or 'VESSELS NOT READY' in upper
+                or 'TANKER DUE' in upper
+                or 'AWAITING' in upper
+            )
+        except Exception as e:
+            logger.debug(f"Could not classify {pdf_path}: {str(e)}")
+            return False
 
     def download_pdf(self, pdf_info):
         """Download PDF file"""
         try:
             filepath = os.path.join(self.project_dir, pdf_info['filename'])
 
-            if os.path.exists(filepath):
+            if os.path.exists(filepath) and os.path.getsize(filepath) > 1000:
                 logger.info(f"✓ PDF already exists: {pdf_info['filename']}")
                 return filepath
 
             logger.info(f"📥 Downloading: {pdf_info['filename']}")
 
-            response = self.session.get(pdf_info['url'], timeout=30)
-            response.raise_for_status()
+            response = self._fetch_with_retries(pdf_info['url'], timeout=90, attempts=3)
 
             with open(filepath, 'wb') as f:
                 f.write(response.content)
+
+            if not response.content.startswith(b'%PDF'):
+                logger.error(f"❌ Downloaded file is not a valid PDF: {pdf_info['filename']}")
+                os.remove(filepath)
+                return None
 
             logger.info(f"✅ Downloaded: {pdf_info['filename']}")
             return filepath
@@ -341,16 +428,37 @@ class PDFExtractor:
         logger.info("🚢 PDF EXTRACTION TO CSV")
         logger.info("=" * 60)
 
-        # Step 1: Get PDF info
-        pdf_info = self.get_latest_pdf()
-        if not pdf_info:
+        # Step 1: Get candidate PDFs from the listing (newest first)
+        candidates = self.get_latest_pdf()
+        if not candidates:
             logger.warning("No PDF found")
             return False
 
-        # Step 2: Download PDF
-        pdf_path = self.download_pdf(pdf_info)
-        if not pdf_path:
+        # Step 2: Download the top candidates and pick the newest vessel
+        # LINEUP (CPA also files berthing-position sheets under the same
+        # doctype; those parse zero vessels and must be skipped).
+        best = None
+        for pdf_info in candidates[:8]:
+            pdf_path = self.download_pdf(pdf_info)
+            if not pdf_path:
+                continue
+            if not self._is_vessel_lineup(pdf_path):
+                logger.info(f"⏭️  Skipping non-lineup doc: {pdf_info['filename'][:24]}...")
+                continue
+            dated = self._pdf_dated(pdf_path)
+            logger.info(f"📅 {pdf_info['filename'][:24]}... -> DATED {dated:%d/%m/%Y if dated else 'n/a'}")
+            if dated is None:
+                continue
+            if best is None or dated > best['dated']:
+                best = {'pdf_info': pdf_info, 'dated': dated, 'pdf_path': pdf_path}
+
+        if best is None:
+            logger.error("❌ Could not determine the latest vessel PDF")
             return False
+
+        pdf_info = best['pdf_info']
+        pdf_path = best['pdf_path']
+        logger.info(f"📄 Using newest vessel PDF: {pdf_info['filename']} (DATED {best['dated']:%d/%m/%Y})")
 
         # Step 3: Extract table
         vessels = self.extract_table_from_pdf(pdf_path)
