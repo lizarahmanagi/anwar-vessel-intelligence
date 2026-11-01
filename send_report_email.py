@@ -374,21 +374,14 @@ class EmailReportSender:
                 generated_date = line.split("**Generated**: ")[-1].strip() if "**Generated**:" in line else generated_date
 
         # Build vessel table rows with comparison metrics (all vessels)
-        vessel_rows = ""
-        for vessel in vessels:
-            vessel_rows += f"""
-            <tr>
-                <td>{vessel.get('sl', '')}</td>
-                <td>{vessel.get('name', '')}</td>
-                <td>{vessel.get('arrival', '')}</td>
-                <td>{vessel.get('cargo_type', '')}</td>
-                <td>{vessel.get('status', '')}</td>
-                <td>{vessel.get('type', '')}</td>
-                <td>{vessel.get('utilization', '')}</td>
-                <td>{vessel.get('revenue', '')}</td>
-                <td>{vessel.get('agent', '')}</td>
-            </tr>
-            """
+        # Rows are emitted without indentation: at 164 vessels the pretty-printing
+        # alone cost ~20KB, which pushed the MIME message past Gmail's 102KB clip.
+        _cols = ('sl', 'name', 'arrival', 'cargo_type', 'status', 'type',
+                 'utilization', 'revenue', 'agent')
+        vessel_rows = "".join(
+            "<tr>" + "".join(f"<td>{vessel.get(c, '')}</td>" for c in _cols) + "</tr>"
+            for vessel in vessels
+        )
 
         # Critical supply banner: clinker/coal/scrap vessels waiting >14 days
         critical_alerts = self.extract_critical_alerts(markdown_text)
@@ -407,390 +400,176 @@ class EmailReportSender:
                 {alert_lines}
             </div>"""
 
-        html = f"""
-<!DOCTYPE html>
+        lineup_heading = f"Anwar Group Supply Lineup ({len(vessels)} Vessels)"
+
+        html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        body {{
-            font-family: -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
-            background-color: #f5f6fa;
-            color: #2d3748;
-            line-height: 1.6;
-        }}
-        .container {{
-            max-width: 750px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            box-shadow: 0 8px 24px rgba(25, 103, 210, 0.12);
-            border-radius: 12px;
-            overflow: hidden;
-        }}
-        .header {{
-            background: #123F76;
-            background: linear-gradient(135deg, #123F76 0%, #1e5a9f 50%, #123F76 100%);
-            color: white;
-            padding: 16px 20px 14px 20px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }}
-        .header::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at top right, rgba(255,255,255,0.1), transparent);
-            pointer-events: none;
-        }}
-        .header::after {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-            animation: glitch-shimmer 3s infinite;
-            pointer-events: none;
-        }}
-        @keyframes glitch-shimmer {{
-            0%, 100% {{ left: -100%; }}
-            50% {{ left: 100%; }}
-        }}
-        .header h1 {{
-            font-size: 22px;
-            margin-bottom: 2px;
-            font-weight: 700;
-            letter-spacing: 0.2px;
-            position: relative;
-            z-index: 1;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-        }}
-        .header .subtitle {{
-            font-size: 11px;
-            opacity: 0.9;
-            margin-bottom: 6px;
-            font-weight: 400;
-            position: relative;
-            z-index: 1;
-        }}
-        .header .date {{
-            font-size: 10px;
-            opacity: 0.8;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            padding-top: 6px;
-            position: relative;
-            z-index: 1;
-        }}
-        .content {{
-            padding: 20px;
-        }}
-        .section {{
-            margin-bottom: 14px;
-        }}
-        .section h2 {{
-            color: #123F76;
-            font-size: 14px;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #123F76;
-            font-weight: 700;
-            letter-spacing: 0.2px;
-        }}
-        .stats-container {{
-            width: 100%;
-        }}
-        .stat-card {{
-            width: 25%;
-            background: #f0f7ff;
-            padding: 12px 10px;
-            border-radius: 6px;
-            border-left: 4px solid #123F76;
-            vertical-align: top;
-            position: relative;
-        }}
-        .stat-card::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(25, 103, 210, 0.2), transparent);
-        }}
-        .stat-card.blue {{
-            background: #123F76;
-            background: linear-gradient(135deg, #123F76 0%, #1e5a9f 100%);
-            border-left: 5px solid #1e5a9f;
-            color: white;
-        }}
-        .stat-card.blue .stat-label {{
-            color: rgba(255,255,255,0.85);
-        }}
-        .stat-card.blue .stat-value {{
-            color: white;
-        }}
-        .stat-card.green {{
-            background: #0d4f7f;
-            background: linear-gradient(135deg, #0d4f7f 0%, #1669a3 100%);
-            border-left: 5px solid #1669a3;
-            color: white;
-        }}
-        .stat-card.green .stat-label {{
-            color: rgba(255,255,255,0.85);
-        }}
-        .stat-card.green .stat-value {{
-            color: white;
-        }}
-        .stat-card.orange {{
-            background: #2b8fc4;
-            background: linear-gradient(135deg, #2b8fc4 0%, #2196f3 100%);
-            border-left: 5px solid #2196f3;
-            color: white;
-        }}
-        .stat-card.orange .stat-label {{
-            color: rgba(255,255,255,0.85);
-        }}
-        .stat-card.orange .stat-value {{
-            color: white;
-        }}
-        .stat-card.purple {{
-            background: #4d9fc6;
-            background: linear-gradient(135deg, #4d9fc6 0%, #3a8ec4 100%);
-            border-left: 5px solid #3a8ec4;
-            color: white;
-        }}
-        .stat-card.purple .stat-label {{
-            color: rgba(255,255,255,0.85);
-        }}
-        .stat-card.purple .stat-value {{
-            color: white;
-        }}
-        .stat-label {{
-            font-size: 8px;
-            color: #718096;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-            font-weight: 600;
-            letter-spacing: 0.6px;
-        }}
-        .stat-value {{
-            font-size: 15px;
-            font-weight: 700;
-            color: #123F76;
-            line-height: 1;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 12px;
-            font-size: 11px;
-        }}
-        thead {{
-            background: #123F76;
-            background: linear-gradient(135deg, #123F76 0%, #1e5a9f 100%);
-            color: white;
-        }}
-        th {{
-            padding: 10px 10px;
-            text-align: left;
-            font-weight: 700;
-            letter-spacing: 0.2px;
-            font-size: 10px;
-            text-transform: uppercase;
-        }}
-        td {{
-            padding: 8px 10px;
-            border-bottom: 1px solid #e2e8f0;
-            color: #2d3748;
-        }}
-        tbody tr {{
-            transition: background-color 0.2s ease;
-        }}
-        tbody tr:nth-child(odd) {{
-            background: #f8fafc;
-        }}
-        tbody tr:nth-child(even) {{
-            background: #ffffff;
-        }}
-        tbody tr:hover {{
-            background: #eef2ff;
-        }}
-        .card {{
-            background: #ffffff;
-            padding: 16px;
-            border-radius: 8px;
-            border-left: 4px solid #123F76;
-            margin-bottom: 10px;
-            box-shadow: 0 1px 3px rgba(25, 103, 210, 0.08);
-            border-top: 1px solid #e2e8f0;
-        }}
-        .card-title {{
-            font-size: 13px;
-            color: #123F76;
-            font-weight: 700;
-            margin-bottom: 6px;
-        }}
-        .card-detail {{
-            font-size: 12px;
-            color: #4a5568;
-            line-height: 1.5;
-        }}
-        .divider {{
-            border: none;
-            border-top: 1px solid #e2e8f0;
-            margin: 8px 0;
-        }}
-        .footer {{
-            background: #123F76;
-            background: linear-gradient(135deg, #123F76 0%, #1e5a9f 100%);
-            padding: 15px 25px;
-            text-align: center;
-            font-size: 11px;
-            color: #ffffff;
-            border-top: 3px solid #123F76;
-        }}
-        .footer p {{
-            margin: 2px 0;
-            opacity: 0.9;
-        }}
-        .footer strong {{
-            font-weight: 700;
-        }}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<style>
+body {{ margin:0; padding:0; background-color:#f5f6fa; }}
+.vt th {{ padding:8px 7px; background-color:#123F76; color:#ffffff; font-size:10px; text-align:left; text-transform:uppercase; font-weight:700; }}
+.vt td {{ padding:6px 7px; border-bottom:1px solid #e2e8f0; color:#2d3748; font-size:11px; word-break:break-word; }}
+.rt th {{ padding:8px; background-color:#123F76; color:#ffffff; font-size:10px; text-align:left; text-transform:uppercase; font-weight:700; }}
+</style>
 </head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>BlueRoute Shipping Intelligence</h1>
-            <div class="subtitle">Anwar Group of Industries — Chittagong Port Supply Intelligence</div>
-            <div class="date">Generated: {generated_date}</div>
-        </div>
+<body style="margin:0;padding:0;background-color:#f5f6fa;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;background-color:#f5f6fa;">
+<tr>
+<td align="center" style="padding:16px 8px;">
 
-        <!-- Content -->
-        <div class="content">
-            {alert_banner}
-            <!-- Fleet Statistics -->
-            <div class="section">
-                <h2>📊 Fleet Summary</h2>
-                <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%;">
-                    <tr>
-                        <td width="25%" valign="top" style="padding: 5px;">
-                            <div class="stat-card blue">
-                                <div class="stat-label">Total Fleet</div>
-                                <div class="stat-value">{stats.get('Total Fleet', '0')}</div>
-                            </div>
-                        </td>
-                        <td width="25%" valign="top" style="padding: 5px;">
-                            <div class="stat-card green">
-                                <div class="stat-label">Active Vessels</div>
-                                <div class="stat-value">{stats.get('Active Vessels', '0')}</div>
-                            </div>
-                        </td>
-                        <td width="25%" valign="top" style="padding: 5px;">
-                            <div class="stat-card orange">
-                                <div class="stat-label">Total Capacity</div>
-                                <div class="stat-value" style="font-size: 16px;">{stats.get('Total Capacity', '0 GRT')}</div>
-                            </div>
-                        </td>
-                        <td width="25%" valign="top" style="padding: 5px;">
-                            <div class="stat-card purple">
-                                <div class="stat-label">Avg Draft</div>
-                                <div class="stat-value">{stats.get('Average Draft', '0')}m</div>
-                            </div>
-                        </td>
-                    </tr>
-                </table>
-            </div>
+<table role="presentation" width="750" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:750px;max-width:750px;background-color:#ffffff;">
 
-            <div class="divider"></div>
+<tr>
+<td bgcolor="#123F76" align="center" style="background-color:#123F76;padding:18px 20px 14px 20px;">
+<div style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.2px;font-family:'Segoe UI',Arial,sans-serif;">BlueRoute Shipping Intelligence</div>
+<div style="font-size:11px;color:#cfe0f3;padding-top:5px;font-family:'Segoe UI',Arial,sans-serif;">Anwar Group of Industries &mdash; Chittagong Port Supply Intelligence</div>
+<div style="font-size:10px;color:#b9d2ec;padding-top:9px;font-family:'Segoe UI',Arial,sans-serif;">Generated: {generated_date}</div>
+</td>
+</tr>
 
-            <!-- Weekly Comparison Section -->
-            {self._format_weekly_comparison(weekly_comparison)}
+<tr>
+<td style="padding:20px;font-family:'Segoe UI',Arial,sans-serif;">
+{alert_banner}
+{self._section_heading('&#128202; Fleet Summary')}
+{self._stat_cards(stats)}
+{self._format_weekly_comparison(weekly_comparison)}
+{self._format_sbu_radar(cargo_distribution)}
+{self._format_cargo_distribution(cargo_distribution)}
+{self._format_section_distribution(section_distribution)}
+{self._section_heading('&#127919; AI-Powered Strategic Insights')}
+{self._format_strategic_analysis(strategic_analysis)}
+{self._section_heading(lineup_heading)}
+<table class="vt" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;table-layout:fixed;">
+<thead>
+<tr>
+<th width="5%">No.</th>
+<th width="17%">Vessel</th>
+<th width="9%">Arrival</th>
+<th width="13%">Cargo</th>
+<th width="12%">Status</th>
+<th width="9%">Type</th>
+<th width="9%">Util.</th>
+<th width="9%">Rev.</th>
+<th width="17%">Agent</th>
+</tr>
+</thead>
+<tbody>
+{vessel_rows if vessel_rows else '<tr><td colspan="9" style="text-align:center;padding:20px;color:#999999;">No vessel data available</td></tr>'}
+</tbody>
+</table>
+</td>
+</tr>
 
-            <div class="divider"></div>
+<tr>
+<td bgcolor="#123F76" align="center" style="background-color:#123F76;padding:16px 25px;font-family:'Segoe UI',Arial,sans-serif;">
+<div style="font-size:12px;font-weight:700;color:#ffffff;">BlueRoute Shipping Intelligence</div>
+<div style="font-size:11px;color:#cfe0f3;padding-top:3px;">Prepared for Anwar Group of Industries &mdash; Anwar Ispat &middot; Anwar Cement &middot; Anwar Cement Sheet &middot; Anwar Galvanizing &middot; A1 Polymer</div>
+<div style="font-size:12px;color:#ffffff;letter-spacing:0.4px;padding-top:14px;">WE'D LOVE TO HEAR FROM YOU</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-collapse:collapse;margin-top:10px;">
+<tr>
+<td bgcolor="#ffffff" style="background-color:#ffffff;padding:10px 18px;"><a href="https://docs.google.com/forms/d/e/1FAIpQLScW9S5lbqIvDKIXgS8iUtXanF7K25cYdxcKzf7Qc-4MCoCdFQ/viewform" style="color:#123F76;font-weight:700;font-size:13px;text-decoration:none;font-family:'Segoe UI',Arial,sans-serif;">Share Your Feedback</a></td>
+<td width="12"></td>
+<td bgcolor="#1e5a9f" style="background-color:#1e5a9f;padding:10px 18px;border:2px solid #ffffff;"><a href="https://docs.google.com/forms/d/e/1FAIpQLSfnblxWqVcz4OqBYBSErxD19RFKt8z0gUip9oljkKz3r8IWIQ/viewform" style="color:#ffffff;font-weight:700;font-size:13px;text-decoration:none;font-family:'Segoe UI',Arial,sans-serif;">Stakeholder Satisfaction Survey</a></td>
+</tr>
+</table>
+<div style="font-size:11px;color:#cfe0f3;padding-top:12px;">Generated by Digital Transformation Team</div>
+</td>
+</tr>
 
-            <!-- SBU Supply Radar -->
-            {self._format_sbu_radar(cargo_distribution)}
+</table>
 
-            <!-- Cargo Type Distribution -->
-            {self._format_cargo_distribution(cargo_distribution)}
-
-            <!-- Section Distribution -->
-            {self._format_section_distribution(section_distribution)}
-
-            <div class="divider"></div>
-
-            <!-- Strategic Analysis Section -->
-            <div class="section">
-                <h2>🎯 AI-Powered Strategic Insights</h2>
-                <div style="margin: 15px 0;">
-                    {self._format_strategic_analysis(strategic_analysis)}
-                </div>
-            </div>
-
-            <div class="divider"></div>
-
-            <!-- Vessel Table -->
-            <div class="section">
-                <h2>Anwar Group Supply Lineup ({len(vessels)} Vessels)</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 5%;">No.</th>
-                            <th style="width: 14%;">Vessel Name</th>
-                            <th style="width: 8%;">Arrival</th>
-                            <th style="width: 10%;">Cargo Type</th>
-                            <th style="width: 10%;">Status</th>
-                            <th style="width: 9%;">Type</th>
-                            <th style="width: 11%;">Utilization</th>
-                            <th style="width: 9%;">Revenue</th>
-                            <th style="width: 14%;">Agent</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {vessel_rows if vessel_rows else '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">No vessel data available</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-            <p><strong>BlueRoute Shipping Intelligence</strong></p>
-            <p>Prepared for Anwar Group of Industries — Anwar Ispat · Anwar Cement · Anwar Cement Sheet · Anwar Galvanizing · A1 Polymer</p>
-            <p style="margin-top: 14px; font-size: 12px; letter-spacing: 0.4px;">WE'D LOVE TO HEAR FROM YOU</p>
-            <div style="margin-top: 10px;">
-                <a href="https://docs.google.com/forms/d/e/1FAIpQLScW9S5lbqIvDKIXgS8iUtXanF7K25cYdxcKzf7Qc-4MCoCdFQ/viewform" style="display: inline-block; background-color: #ffffff; color: #123F76; font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: 6px; text-decoration: none; margin: 4px 6px;">Share Your Feedback</a>
-                <a href="https://docs.google.com/forms/d/e/1FAIpQLSfnblxWqVcz4OqBYBSErxD19RFKt8z0gUip9oljkKz3r8IWIQ/viewform" style="display: inline-block; background-color: #1e5a9f; color: #ffffff; font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: 6px; text-decoration: none; border: 2px solid #ffffff; margin: 4px 6px;">Stakeholder Satisfaction Survey</a>
-            </div>
-            <p style="margin-top: 10px;">Generated by Digital Transformation Team</p>
-        </div>
-    </div>
+</td>
+</tr>
+</table>
 </body>
-</html>
+</html>"""
+        # Collapse inter-tag whitespace. Every byte here is multiplied by
+        # quoted-printable encoding, and the margin to Gmail's 102KB cap is thin.
+        return re.sub(r'>\s+<', '><', html)
+
+    def _plain_summary(self, markdown_text):
+        """Short text/plain alternative.
+
+        The full markdown is ~22KB and, once quoted-printable encoded, was a large
+        part of what pushed the message over Gmail's clip threshold. Virtually every
+        recipient renders the HTML part, so the text part only needs to be a usable
+        fallback pointer rather than a byte-for-byte duplicate.
         """
-        return html
+        stats = self.extract_stats_from_markdown(markdown_text)
+        alerts = self.extract_critical_alerts(markdown_text)
+        lines = [
+            "BlueRoute Shipping Intelligence",
+            "Anwar Group of Industries - Chittagong Port Supply Intelligence",
+            "",
+        ]
+        for key in ('Total Fleet', 'Active Vessels', 'Total Capacity'):
+            if stats.get(key):
+                lines.append(f"{key}: {stats[key]}")
+        if stats.get('Average Draft'):
+            lines.append(f"Average Draft: {self._fmt_draft(stats['Average Draft'])}")
+        if alerts:
+            lines += ["", "Critical supply alerts:"]
+            lines += [f"  - {a}" for a in alerts]
+        lines += [
+            "",
+            "This report is formatted as HTML. Please view it in an HTML-capable "
+            "mail client for the full vessel lineup and strategic analysis.",
+        ]
+        return "\n".join(lines)
+
+    def _section_heading(self, title):
+        """Section heading bar - inline styled so it survives Gmail and Outlook."""
+        return (
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+            'style="border-collapse:collapse;width:100%;margin:16px 0 10px 0;">'
+            '<tr><td style="padding:0 0 7px 0;border-bottom:2px solid #123F76;'
+            "font-size:14px;font-weight:700;color:#123F76;letter-spacing:0.2px;"
+            f"font-family:'Segoe UI',Arial,sans-serif;\">{title}</td></tr></table>"
+        )
+
+    def _fmt_draft(self, raw):
+        """'10.24 meters' -> '10.24 m' (source already carries the unit)."""
+        m = re.search(r'[\d.]+', str(raw or ''))
+        return f"{m.group()} m" if m else str(raw or '0')
+
+    def _stat_cards(self, stats):
+        """Four KPI cards. Each <td> IS the card - no nested percentage-width div."""
+        cards = [
+            ('Total Fleet', stats.get('Total Fleet', '0'), '#123F76', '#1e5a9f'),
+            ('Active Vessels', stats.get('Active Vessels', '0'), '#0d4f7f', '#1669a3'),
+            ('Total Capacity', stats.get('Total Capacity', '0 GRT'), '#2b8fc4', '#2196f3'),
+            ('Avg Draft', self._fmt_draft(stats.get('Average Draft', '0')), '#4d9fc6', '#3a8ec4'),
+        ]
+
+        tds = ""
+        for idx, (label, value, bg, bar) in enumerate(cards):
+            pad_right = '0' if idx == 3 else '6px'
+            tds += (
+                f'<td width="25%" valign="top" style="padding:0 {pad_right} 0 0;">'
+                f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+                f'bgcolor="{bg}" style="border-collapse:collapse;width:100%;background-color:{bg};">'
+                f'<tr><td style="padding:12px 10px;border-left:4px solid {bar};">'
+                f'<div style="font-size:9px;color:#dbe7f5;text-transform:uppercase;font-weight:600;'
+                f'letter-spacing:0.5px;padding-bottom:5px;">{label}</div>'
+                f'<div style="font-size:16px;color:#ffffff;font-weight:700;line-height:1.15;">{value}</div>'
+                f'</td></tr></table></td>'
+            )
+
+        return (
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+            f'style="border-collapse:collapse;width:100%;"><tr>{tds}</tr></table>'
+        )
 
     def _format_weekly_comparison(self, weekly_comparison):
         """Format weekly comparison with user-friendly design"""
         if not weekly_comparison:
             return ""
 
-        html = '<div class="section"><h2>Weekly Comparison (vs Last Week)</h2>'
-        html += '<table style="width: 100%; border-collapse: collapse;">'
+        html = self._section_heading('Weekly Comparison (vs Last Week)')
+        html += ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+                 'style="width:100%;border-collapse:collapse;">')
 
         metrics = list(weekly_comparison.items())
         for i in range(0, len(metrics), 2):
@@ -863,7 +642,7 @@ class EmailReportSender:
 
             html += '</tr>'
 
-        html += '</table></div>'
+        html += '</table>'
         return html
 
     def _format_cargo_distribution(self, cargo_types):
@@ -913,19 +692,18 @@ class EmailReportSender:
                 <td style="padding: 6px 8px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #4a5568;">{sbu}</td>
             </tr>"""
 
-        return f"""<div class="section">
-            <h2>🏭 Anwar Group SBU Supply Radar</h2>
-            <table style="width: 100%; border-collapse: collapse; margin-top: 0;">
+        heading = self._section_heading('&#127981; Anwar Group SBU Supply Radar')
+        return f"""{heading}
+            <table class="rt" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;table-layout:fixed;">
                 <thead>
                     <tr>
-                        <th style="width: 28%;">Supply Category</th>
-                        <th style="width: 18%; text-align: center;">Vessels</th>
-                        <th style="width: 54%;">Consuming SBU</th>
+                        <th width="28%">Supply Category</th>
+                        <th width="18%" style="text-align:center;">Vessels</th>
+                        <th width="54%">Consuming SBU</th>
                     </tr>
                 </thead>
                 <tbody>{rows}</tbody>
-            </table>
-        </div>"""
+            </table>"""
 
     def _format_section_distribution(self, sections):
         """Format section distribution as modern badge cards"""
@@ -1090,8 +868,8 @@ class EmailReportSender:
             msg["From"] = self.sender_email
             msg["To"] = ", ".join(self.receiver_emails)
 
-            # Create plain text version
-            text_part = MIMEText(report_content, "plain")
+            # Create plain text version (summary, not the full markdown - see _plain_summary)
+            text_part = MIMEText(self._plain_summary(report_content), "plain")
             msg.attach(text_part)
 
             # Create HTML version
